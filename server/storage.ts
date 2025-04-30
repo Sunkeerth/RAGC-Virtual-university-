@@ -54,7 +54,7 @@ export interface IStorage {
   generateStudentId(): string;
 
   // Session store
-  sessionStore: session.SessionStore;
+  sessionStore: session.Store;
 }
 
 // Memory storage implementation
@@ -77,7 +77,7 @@ export class MemStorage implements IStorage {
   private sessionCurrentId: number;
   
   // Session store
-  sessionStore: session.SessionStore;
+  sessionStore: session.Store;
   
   constructor() {
     // Initialize maps
@@ -417,5 +417,337 @@ export class MemStorage implements IStorage {
   }
 }
 
+// Database storage implementation
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
+import connectPg from "connect-pg-simple";
+import { pool } from "./db";
+
+const PostgresSessionStore = connectPg(session);
+
+export class DatabaseStorage implements IStorage {
+  sessionStore: session.Store;
+
+  constructor() {
+    this.sessionStore = new PostgresSessionStore({ 
+      pool, 
+      tableName: 'sessions',
+      createTableIfMissing: true 
+    });
+  }
+
+  // User operations
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async getUserByStudentId(studentId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.studentId, studentId));
+    return user;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    // If it's a student and no studentId is provided, generate one
+    if (user.role === 'student' && !user.studentId) {
+      user.studentId = this.generateStudentId();
+    }
+    
+    const [createdUser] = await db.insert(users).values(user).returning();
+    return createdUser;
+  }
+
+  async updateUser(id: number, userData: Partial<User>): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(userData)
+      .where(eq(users.id, id))
+      .returning();
+    
+    if (!updatedUser) {
+      throw new Error(`User with ID ${id} not found`);
+    }
+    
+    return updatedUser;
+  }
+
+  // Branch operations
+  async getBranch(id: number): Promise<Branch | undefined> {
+    const [branch] = await db.select().from(branches).where(eq(branches.id, id));
+    return branch;
+  }
+
+  async getBranches(): Promise<Branch[]> {
+    return await db.select().from(branches);
+  }
+
+  async createBranch(branch: InsertBranch): Promise<Branch> {
+    const [createdBranch] = await db.insert(branches).values(branch).returning();
+    return createdBranch;
+  }
+
+  // Equipment kit operations
+  async getEquipmentKitsByBranchId(branchId: number): Promise<EquipmentKit[]> {
+    return await db
+      .select()
+      .from(equipmentKits)
+      .where(eq(equipmentKits.branchId, branchId));
+  }
+
+  async createEquipmentKit(kit: InsertEquipmentKit): Promise<EquipmentKit> {
+    const [createdKit] = await db.insert(equipmentKits).values(kit).returning();
+    return createdKit;
+  }
+
+  // Specialization operations
+  async getSpecializationsByBranchId(branchId: number): Promise<Specialization[]> {
+    return await db
+      .select()
+      .from(specializations)
+      .where(eq(specializations.branchId, branchId));
+  }
+
+  async createSpecialization(specialization: InsertSpecialization): Promise<Specialization> {
+    const [createdSpecialization] = await db
+      .insert(specializations)
+      .values(specialization)
+      .returning();
+    
+    return createdSpecialization;
+  }
+
+  // Payment operations
+  async createPayment(payment: InsertPayment): Promise<Payment> {
+    const [createdPayment] = await db.insert(payments).values(payment).returning();
+    return createdPayment;
+  }
+
+  async getPaymentsByUserId(userId: number): Promise<Payment[]> {
+    return await db
+      .select()
+      .from(payments)
+      .where(eq(payments.userId, userId));
+  }
+
+  // Video operations
+  async getVideosByBranchId(branchId: number): Promise<Video[]> {
+    return await db
+      .select()
+      .from(videos)
+      .where(eq(videos.branchId, branchId));
+  }
+
+  async getVideosByTeacherId(teacherId: number): Promise<Video[]> {
+    return await db
+      .select()
+      .from(videos)
+      .where(eq(videos.teacherId, teacherId));
+  }
+
+  async createVideo(video: InsertVideo): Promise<Video> {
+    const [createdVideo] = await db.insert(videos).values(video).returning();
+    return createdVideo;
+  }
+
+  // VR Session operations
+  async createVrSession(session: InsertVrSession): Promise<VrSession> {
+    const [createdSession] = await db
+      .insert(vrSessions)
+      .values(session)
+      .returning();
+    
+    return createdSession;
+  }
+
+  async updateVrSession(id: number, sessionData: Partial<VrSession>): Promise<VrSession> {
+    const [updatedSession] = await db
+      .update(vrSessions)
+      .set(sessionData)
+      .where(eq(vrSessions.id, id))
+      .returning();
+    
+    if (!updatedSession) {
+      throw new Error(`VR Session with ID ${id} not found`);
+    }
+    
+    return updatedSession;
+  }
+
+  async getVrSessionsByUserId(userId: number): Promise<VrSession[]> {
+    return await db
+      .select()
+      .from(vrSessions)
+      .where(eq(vrSessions.userId, userId));
+  }
+
+  // Generate unique student ID
+  generateStudentId(): string {
+    return `STU-${generateId(6)}`;
+  }
+
+  // Seed initial branches (only used for development)
+  async seedBranches() {
+    // Check if branches already exist
+    const existingBranches = await this.getBranches();
+    if (existingBranches.length > 0) {
+      console.log("Branches already exist, skipping seed");
+      return;
+    }
+
+    const branchesData: InsertBranch[] = [
+      {
+        name: "Computer Science Engineering",
+        description: "Programming, algorithms, and software development",
+        location: "Bangalore",
+        image: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97",
+        price: 45000,
+        studentsCount: 425,
+        teachersCount: 12
+      },
+      {
+        name: "Electrical Engineering",
+        description: "Circuits, power systems, and electronics",
+        location: "Mumbai",
+        image: "https://images.unsplash.com/photo-1623479322729-28b25c16b011",
+        price: 42000,
+        studentsCount: 310,
+        teachersCount: 8
+      },
+      {
+        name: "Mechanical Engineering",
+        description: "Machines, thermodynamics, and manufacturing",
+        location: "Delhi",
+        image: "https://images.unsplash.com/photo-1537462715879-360eeb61a0ad",
+        price: 40000,
+        studentsCount: 275,
+        teachersCount: 7
+      },
+      {
+        name: "Civil Engineering",
+        description: "Structures, construction, and infrastructure",
+        location: "Chennai",
+        image: "https://images.unsplash.com/photo-1581093450021-4a7360e9a6b5",
+        price: 38000,
+        studentsCount: 240,
+        teachersCount: 6
+      },
+      {
+        name: "Chemical Engineering",
+        description: "Reactions, materials, and processing",
+        location: "Hyderabad",
+        image: "https://images.unsplash.com/photo-1532094349884-543bc11b234d",
+        price: 39000,
+        studentsCount: 195,
+        teachersCount: 5
+      },
+      {
+        name: "AI & Machine Learning",
+        description: "Neural networks, data science, and automation",
+        location: "Pune",
+        image: "https://images.unsplash.com/photo-1555255707-c07966088b7b",
+        price: 48000,
+        studentsCount: 520,
+        teachersCount: 14
+      },
+      {
+        name: "Internet of Things",
+        description: "Connected devices, sensors, and smart systems",
+        location: "Bangalore",
+        image: "https://images.unsplash.com/photo-1518770660439-4636190af475",
+        price: 44000,
+        studentsCount: 385,
+        teachersCount: 9
+      },
+      {
+        name: "VR & AR Technology",
+        description: "Virtual environments, 3D modeling, and interaction",
+        location: "Mumbai",
+        image: "https://images.unsplash.com/photo-1626379953822-baec19c3accd",
+        price: 46000,
+        studentsCount: 310,
+        teachersCount: 8
+      }
+    ];
+    
+    for (const branchData of branchesData) {
+      const branch = await this.createBranch(branchData);
+      
+      // Add equipment kits for Computer Science branch
+      if (branch.name === "Computer Science Engineering") {
+        await this.createEquipmentKit({
+          branchId: branch.id,
+          name: "Development Laptop",
+          description: "High-performance laptop for programming and development",
+          icon: "laptop"
+        });
+        
+        await this.createEquipmentKit({
+          branchId: branch.id,
+          name: "VR Headset",
+          description: "For virtual lab experiences and 3D simulations",
+          icon: "headset"
+        });
+        
+        await this.createEquipmentKit({
+          branchId: branch.id,
+          name: "IoT Development Kit",
+          description: "Arduino, Raspberry Pi, and sensors for IoT projects",
+          icon: "memory"
+        });
+        
+        await this.createEquipmentKit({
+          branchId: branch.id,
+          name: "Cloud Credits",
+          description: "AWS/Azure/GCP credits for cloud computing practices",
+          icon: "storage"
+        });
+        
+        // Add specializations
+        await this.createSpecialization({
+          branchId: branch.id,
+          name: "Artificial Intelligence",
+          description: "Focus on machine learning, neural networks, and AI applications",
+          teachersCount: 4,
+          modulesCount: 12
+        });
+        
+        await this.createSpecialization({
+          branchId: branch.id,
+          name: "Cybersecurity",
+          description: "Network security, ethical hacking, and threat analysis",
+          teachersCount: 3,
+          modulesCount: 10
+        });
+        
+        await this.createSpecialization({
+          branchId: branch.id,
+          name: "Full-Stack Development",
+          description: "Complete web and mobile application development",
+          teachersCount: 5,
+          modulesCount: 15
+        });
+        
+        await this.createSpecialization({
+          branchId: branch.id,
+          name: "Cloud Computing",
+          description: "Cloud architecture, services, and deployment",
+          teachersCount: 3,
+          modulesCount: 8
+        });
+      }
+    }
+  }
+}
+
 // Create and export storage instance
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
