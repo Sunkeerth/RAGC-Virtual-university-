@@ -1,0 +1,104 @@
+I want to build a YouTube-style Learning Management System (LMS) that includes the following features and tech stack:
+
+---
+
+## 1. User Authentication
+
+1. **Signup Page**  
+   - Fields: Name, Email, Phone Number, Address, Role (Student or Teacher), Password & Confirm Password  
+   - On submit: validate inputs, hash the password, and store the record in a MySQL `users` table.
+
+2. **Login Page**  
+   - Fields: Email (or Unique Student ID) and Password  
+   - On submit: authenticate against MySQL; issue a JWT and redirect to the main dashboard.
+
+3. **Unique-ID Login**  
+   - After enrollment, each student receives a unique ID (e.g., `STU-abc123`), stored in MongoDB alongside their profile.  
+   - On first login with that ID, prompt for password reset and display a “My Profile” link.
+
+---
+
+## 2. Main Dashboard (YouTube-Style)
+
+- **Layout & Styling**  
+  - A persistent left **sidebar** listing branches (CSE, EEE, etc.) with icons.  
+  - A top **masthead** with your logo, a centered search bar (rounded, shadowed), and a user avatar/dropdown on the right.  
+  - Content area: a responsive **grid** of branch cards, each styled as a white, rounded-corner card with subtle shadow and hover elevation—just like YouTube’s video tiles.
+
+- **Branch Cards**  
+  - Display branch name, location badge, a short description, and an image/icon.  
+  - On hover: slight scale-up and deeper drop-shadow.
+
+---
+
+## 3. Branch Details & Kits
+
+- **Branch Detail View**  
+  - When a user clicks a branch card, show a detailed page or modal:  
+    - Full description  
+    - A **“Core Equipment Kit”** list (e.g., VR headset, network simulator)  
+    - A **“Specializations”** section with sub-branches and their specific tools.
+
+- **Kit Styling**  
+  - List items with icons (🔧 or 🎮), light background, rounded corners, and consistent spacing.
+
+---
+
+## 4. Enrollment & Payments
+
+1. **Enroll Button** on the branch detail view leads to a **Payment Component**.  
+2. **Payment Methods**: support credit/debit cards, UPI, net banking, wallets (via Stripe or Razorpay).  
+3. **Installment Plan** (displayed in a clear table):  
+   | Installment | Percentage | Amount          | Due Date           |
+   |-------------|------------|-----------------|--------------------|
+   | 1           | 40%        | ₹X              | Immediately        |
+   | 2           | 30%        | ₹Y              | 30 days after      |
+   | 3           | 30%        | ₹Z              | 60 days after      |
+4. On payment success:  
+   - Store payment and installment records in MySQL.  
+   - Generate a unique student ID (`STU-UUID`) and save the profile to MongoDB.
+
+---
+
+## 5. Teacher Video Management
+
+- **Teacher Dashboard** (after login):  
+  - A form to register any number of private YouTube videos (via YouTube Data API) with Title, Description, and Branch Tags.  
+  - Store video metadata in MongoDB under the teacher’s profile.
+- **Student View**:  
+  - On branch pages, embed those private YouTube videos (authenticated via your backend) so only enrolled students (by unique ID) can watch them.
+
+---
+
+## 6. VR Lab Integration
+
+- **VR Lab Page**  
+  - Use WebXR (A-Frame or React Three Fiber) to render a virtual lab environment with realistic 3D models of equipment.  
+  - Interactive hotspots let students “pick up” tools, view specifications, and perform simulated experiments.
+- **Session Logging**  
+  - Record session start/end times and user interactions in MongoDB for analytics and progress tracking.
+
+---
+
+## 7. Tech Stack & Tools
+
+- **Frontend**: HTML, CSS (Tailwind or Chakra UI), JavaScript, React (JSX), React Router, Axios  
+- **Styling**: Tailwind CSS utilities for YouTube-style components (`.yt-btn`, `.yt-input`, `.yt-card`)  
+- **Backend**: Node.js + Express, JWT authentication  
+- **Databases**: MySQL (users, branches, payments, installments), MongoDB (student profiles, video metadata, VR sessions)  
+- **Payments**: Stripe or Razorpay SDK  
+- **Video Hosting**: YouTube Data API (private videos) + React Player  
+- **VR**: A-Frame or React Three Fiber (Three.js)  
+- **Deployment**: Vercel/Netlify (frontend), Heroku/DigitalOcean (backend)
+
+---
+
+This specification is grammatically correct, logically organized, and detailed enough for an AI agent to automatically scaffold:
+
+1. **Database schemas** for MySQL and MongoDB  
+2. **Express routes** and controllers for authentication, branch data, payments, videos, and VR logging  
+3. **React components** for signup, login, dashboard, branch details, payments, video management, and VR lab  
+4. **Tailwind CSS** configuration with custom utility classes for YouTube-style UI  
+5. **Integration code** for payment gateways and YouTube Data API  
+
+Feed this into your AI code-generation pipeline to generate a fully functional, YouTube-inspired LMS!
