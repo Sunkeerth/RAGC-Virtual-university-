@@ -3,10 +3,10 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { MapPin, Users, GraduationCap } from 'lucide-react';
 import { useLocation } from 'wouter';
-import { Branch } from '@shared/schema';
+import { IBranch } from '@shared/schema';
 
 interface BranchCardProps {
-  branch: Branch;
+  branch: IBranch;
   className?: string;
 }
 

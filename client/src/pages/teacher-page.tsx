@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { extractYouTubeId } from '@/lib/utils';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { Loader2, Plus, Upload, X } from 'lucide-react';
-import { Video, insertVideoSchema } from '@shared/schema';
+import { IVideo, insertVideoSchema } from '@shared/schema';
 import {
   Dialog,
   DialogContent,
@@ -68,18 +68,18 @@ export default function TeacherPage() {
   const { toast } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<IVideo | null>(null);
   const [videoPlayerOpen, setVideoPlayerOpen] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   
   // Fetch teacher's videos
-  const { data: videos, isLoading } = useQuery<Video[]>({
+  const { data: videos, isLoading } = useQuery<IVideo[]>({
     queryKey: ['/api/teacher/videos'],
   });
   
   // Fetch branches for dropdown
-  const { data: branches } = useQuery({
+  const { data: branches } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['/api/branches'],
   });
   
@@ -146,7 +146,7 @@ export default function TeacherPage() {
     setSidebarOpen(!sidebarOpen);
   };
   
-  const handleVideoClick = (video: Video) => {
+  const handleVideoClick = (video: IVideo) => {
     setSelectedVideo(video);
     setVideoPlayerOpen(true);
   };
@@ -320,7 +320,7 @@ export default function TeacherPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {branches?.map((branch) => (
+                        {branches?.map((branch: { id: number; name: string }) => (
                           <SelectItem key={branch.id} value={branch.id.toString()}>
                             {branch.name}
                           </SelectItem>

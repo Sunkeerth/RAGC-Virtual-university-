@@ -4,7 +4,7 @@ import { getYouTubeEmbedUrl } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ThumbsUp, ThumbsDown, Share, ListPlus } from 'lucide-react';
-import { Video } from '@shared/schema';
+import { IVideo } from '@shared/schema';
 import { 
   Dialog,
   DialogContent,
@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 
 interface VideoPlayerProps {
-  video: Video | null;
+  video: IVideo | null;
   open: boolean;
   onClose: () => void;
   teacherName?: string;
@@ -60,7 +60,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           <div className="flex items-center text-muted-foreground text-sm mb-4 flex-wrap">
             <span>{teacherName}</span>
             <span className="mx-2">•</span>
-            <span>Branch: {video.branchId}</span>
+            <span>Branch: {video.branchId.toString()}</span>
             <span className="mx-2">•</span>
             <span>{video.views} views</span>
           </div>

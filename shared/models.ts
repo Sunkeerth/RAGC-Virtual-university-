@@ -1,16 +1,8 @@
-// src/shared/schema.ts
 import mongoose, { Schema, Document } from "mongoose";
 import { z } from "zod";
 
-
-export interface IDocument {
-  type: string;
-  url: string;
-  status: 'pending' | 'approved' | 'rejected';
-  uploadedAt: Date;
-  feedback?: string;
-}
 // ---- 1) Interfaces ----
+
 export interface IUser extends Document {
   name: string;
   email: string;
@@ -21,15 +13,7 @@ export interface IUser extends Document {
   password: string;
   studentId?: string;
   enrolledBranches: mongoose.Types.ObjectId[];
-  documents: {
-    type: 'student_id' | 'academic_transcript' | 'teacher_certification' | 'experience_letter';
-    url: string;
-    status: 'pending' | 'approved' | 'rejected';
-    uploadedAt: Date;
-    feedback?: string;
-  }[];
 }
-
 
 export interface IBranch extends Document {
   name: string;
@@ -87,52 +71,40 @@ export interface IVrSession extends Document {
   completed: boolean;
 }
 
+// types/user.ts
+export interface AuthenticatedUser {
+  _id: string;
+  role: string;
+  email: string;
+  enrolledBranches?: string[];
+  studentId?: string;
+}
+
 // ---- 2) Schemas & Models ----
 
-// User
 // const UserSchema = new Schema<IUser>({
 //   name: { type: String, required: true },
 //   email: { type: String, required: true, unique: true },
 //   phone: { type: String, required: true },
 //   address: { type: String, required: true },
-//   role: { type: String, enum: ["student", "teacher", "admin"], default: "student" },
+//   role: z.enum(["student", "teacher"]).default("student"),
+//   // role: { type: String, enum: ["student", "teacher", "admin"], default: "student" },
 //   username: { type: String, required: true, unique: true },
 //   password: { type: String, required: true },
 //   studentId: { type: String, unique: true, sparse: true },
 //   enrolledBranches: [{ type: Schema.Types.ObjectId, ref: "Branch", default: [] }],
 // }, { timestamps: true });
-
-// export const UserModel = mongoose.model<IUser>("User", UserSchema);
-
 const UserSchema = new Schema<IUser>({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   phone: { type: String, required: true },
   address: { type: String, required: true },
-  role: { type: String, enum: ["student", "teacher", "admin"], default: "student" },
+  role: { type: String, enum: ["student", "teacher", "admin"], default: "student" }, // Fixed this line
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   studentId: { type: String, unique: true, sparse: true },
   enrolledBranches: [{ type: Schema.Types.ObjectId, ref: "Branch", default: [] }],
-  documents: [{
-    type: { 
-      type: String,
-      required: true,
-      enum: ['student_id', 'academic_transcript', 'teacher_certification', 'experience_letter'] 
-    },
-    url: { type: String, required: true },
-    status: { 
-      type: String, 
-      enum: ['pending', 'approved', 'rejected'], 
-      default: 'pending' 
-    },
-    uploadedAt: { type: Date, default: Date.now },
-    feedback: { type: String }
-  }]
 }, { timestamps: true });
-
-export const UserModel = mongoose.model<IUser>("User", UserSchema);
-// Branch
 const BranchSchema = new Schema<IBranch>({
   name: { type: String, required: true },
   description: { type: String, required: true },
@@ -143,9 +115,6 @@ const BranchSchema = new Schema<IBranch>({
   teachersCount: { type: Number, default: 0 },
 }, { timestamps: true });
 
-export const BranchModel = mongoose.model<IBranch>("Branch", BranchSchema);
-
-// EquipmentKit
 const EquipmentKitSchema = new Schema<IEquipmentKit>({
   branchId: { type: Schema.Types.ObjectId, ref: "Branch", required: true },
   name: { type: String, required: true },
@@ -153,9 +122,6 @@ const EquipmentKitSchema = new Schema<IEquipmentKit>({
   icon: { type: String, required: true },
 }, { timestamps: true });
 
-export const EquipmentKitModel = mongoose.model<IEquipmentKit>("EquipmentKit", EquipmentKitSchema);
-
-// Specialization
 const SpecializationSchema = new Schema<ISpecialization>({
   branchId: { type: Schema.Types.ObjectId, ref: "Branch", required: true },
   name: { type: String, required: true },
@@ -164,9 +130,6 @@ const SpecializationSchema = new Schema<ISpecialization>({
   modulesCount: { type: Number, default: 0 },
 }, { timestamps: true });
 
-export const SpecializationModel = mongoose.model<ISpecialization>("Specialization", SpecializationSchema);
-
-// Payment
 const PaymentSchema = new Schema<IPayment>({
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   branchId: { type: Schema.Types.ObjectId, ref: "Branch", required: true },
@@ -176,9 +139,6 @@ const PaymentSchema = new Schema<IPayment>({
   stripePaymentId: String,
 }, { timestamps: { createdAt: "createdAt", updatedAt: false } });
 
-export const PaymentModel = mongoose.model<IPayment>("Payment", PaymentSchema);
-
-// Video
 const VideoSchema = new Schema<IVideo>({
   title: { type: String, required: true },
   description: { type: String, required: true },
@@ -190,9 +150,6 @@ const VideoSchema = new Schema<IVideo>({
   views: { type: Number, default: 0 },
 }, { timestamps: { createdAt: "createdAt", updatedAt: false } });
 
-export const VideoModel = mongoose.model<IVideo>("Video", VideoSchema);
-
-// VrSession
 const VrSessionSchema = new Schema<IVrSession>({
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   equipmentId: { type: Schema.Types.ObjectId, ref: "EquipmentKit", required: true },
@@ -202,12 +159,18 @@ const VrSessionSchema = new Schema<IVrSession>({
   completed: { type: Boolean, default: false },
 }, { timestamps: false });
 
+// ---- 3) Mongoose Model Exports ----
+
+export const UserModel = mongoose.model<IUser>("User", UserSchema);
+export const BranchModel = mongoose.model<IBranch>("Branch", BranchSchema);
+export const EquipmentKitModel = mongoose.model<IEquipmentKit>("EquipmentKit", EquipmentKitSchema);
+export const SpecializationModel = mongoose.model<ISpecialization>("Specialization", SpecializationSchema);
+export const PaymentModel = mongoose.model<IPayment>("Payment", PaymentSchema);
+export const VideoModel = mongoose.model<IVideo>("Video", VideoSchema);
 export const VrSessionModel = mongoose.model<IVrSession>("VrSession", VrSessionSchema);
 
+// ---- 4) Zod Validation Schemas ----
 
-// ---- 3) Zod Validation Schemas ----
-
-// User
 export const insertUserSchema = z.object({
   name: z.string(),
   email: z.string().email(),
@@ -221,7 +184,6 @@ export const insertUserSchema = z.object({
 });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
-// Branch
 export const insertBranchSchema = z.object({
   name: z.string(),
   description: z.string(),
@@ -233,7 +195,6 @@ export const insertBranchSchema = z.object({
 });
 export type InsertBranch = z.infer<typeof insertBranchSchema>;
 
-// EquipmentKit
 export const insertEquipmentKitSchema = z.object({
   branchId: z.string().regex(/^[0-9a-fA-F]{24}$/),
   name: z.string(),
@@ -242,7 +203,6 @@ export const insertEquipmentKitSchema = z.object({
 });
 export type InsertEquipmentKit = z.infer<typeof insertEquipmentKitSchema>;
 
-// Specialization
 export const insertSpecializationSchema = z.object({
   branchId: z.string().regex(/^[0-9a-fA-F]{24}$/),
   name: z.string(),
@@ -252,7 +212,6 @@ export const insertSpecializationSchema = z.object({
 });
 export type InsertSpecialization = z.infer<typeof insertSpecializationSchema>;
 
-// Payment
 export const insertPaymentSchema = z.object({
   userId: z.string().regex(/^[0-9a-fA-F]{24}$/),
   branchId: z.string().regex(/^[0-9a-fA-F]{24}$/),
@@ -263,7 +222,6 @@ export const insertPaymentSchema = z.object({
 });
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
-// Video
 export const insertVideoSchema = z.object({
   title: z.string(),
   description: z.string(),
@@ -275,7 +233,6 @@ export const insertVideoSchema = z.object({
 });
 export type InsertVideo = z.infer<typeof insertVideoSchema>;
 
-// VrSession
 export const insertVrSessionSchema = z.object({
   userId: z.string().regex(/^[0-9a-fA-F]{24}$/),
   equipmentId: z.string().regex(/^[0-9a-fA-F]{24}$/),
@@ -284,7 +241,6 @@ export const insertVrSessionSchema = z.object({
 });
 export type InsertVrSession = z.infer<typeof insertVrSessionSchema>;
 
-// Login
 export const loginSchema = z.object({
   username: z.string().min(1),
   password: z.string().min(1),

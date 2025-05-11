@@ -2,22 +2,22 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { useLocation, Link } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
-import { 
-  Home, 
-  BookOpen, 
-  PlayCircle, 
-  History, 
-  Computer, 
-  Zap, 
-  Cpu, 
-  FlaskRound, 
-  Building, 
-  BrainCircuit, 
-  Wifi, 
-  Headset, 
-  Settings, 
-  HelpCircle, 
-  MessageSquare 
+import {
+  Home,
+  BookOpen,
+  PlayCircle,
+  History,
+  Computer,
+  Zap,
+  Cpu,
+  FlaskRound,
+  Building,
+  BrainCircuit,
+  Wifi,
+  Headset,
+  Settings,
+  HelpCircle,
+  MessageSquare
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -28,28 +28,35 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ className, collapsed = false }) => {
   const [location] = useLocation();
   const { user } = useAuth();
-  
+
   const isTeacher = user?.role === 'teacher';
-  
-  const NavItem = ({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string }) => {
+
+  const NavItem = ({
+    href,
+    icon: Icon,
+    label
+  }: {
+    href: string;
+    icon: React.ElementType;
+    label: string;
+  }) => {
     const isActive = location === href;
-    
+
     return (
-      <Link href={href}>
-        <a 
-          className={cn(
-            'flex items-center p-2 rounded hover:bg-muted transition-colors gap-x-3',
-            isActive && 'bg-muted font-medium',
-            collapsed && 'justify-center'
-          )}
-        >
-          <Icon className="h-5 w-5" />
-          {!collapsed && <span>{label}</span>}
-        </a>
+      <Link
+        href={href}
+        className={cn(
+          'flex items-center p-2 rounded hover:bg-muted transition-colors gap-x-3',
+          isActive && 'bg-muted font-medium',
+          collapsed && 'justify-center'
+        )}
+      >
+        <Icon className="h-5 w-5" />
+        {!collapsed && <span>{label}</span>}
       </Link>
     );
   };
-  
+
   const branches = [
     { id: 1, label: 'Computer Science', icon: Computer },
     { id: 2, label: 'Electrical Engineering', icon: Zap },
@@ -58,11 +65,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, collapsed = false }
     { id: 5, label: 'Civil Engineering', icon: Building },
     { id: 6, label: 'AI & Machine Learning', icon: BrainCircuit },
     { id: 7, label: 'Internet of Things', icon: Wifi },
-    { id: 8, label: 'VR & AR Technology', icon: Headset },
+    { id: 8, label: 'VR & AR Technology', icon: Headset }
   ];
-  
+
   return (
-    <aside 
+    <aside
       className={cn(
         'bg-background border-r border-border h-full flex flex-col',
         collapsed ? 'w-16' : 'w-64',
@@ -80,36 +87,36 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, collapsed = false }
           )}
           <NavItem href="/history" icon={History} label="History" />
         </div>
-        
+
         {!collapsed && (
           <div className="text-xs text-muted-foreground mb-2 px-2 font-medium uppercase">
             Branches
           </div>
         )}
-        
+
         <div className="space-y-1 mb-6">
           {branches.map((branch) => (
-            <NavItem 
+            <NavItem
               key={branch.id}
-              href={`/branch/${branch.id}`} 
-              icon={branch.icon} 
+              href={`/branch/${branch.id}`}
+              icon={branch.icon}
               label={branch.label}
             />
           ))}
         </div>
-        
+
         {!collapsed && (
           <div className="text-xs text-muted-foreground mb-2 px-2 font-medium uppercase">
             Settings
           </div>
         )}
-        
+
         <div className="space-y-1">
           <NavItem href="/settings" icon={Settings} label="Settings" />
           <NavItem href="/help" icon={HelpCircle} label="Help" />
           <NavItem href="/feedback" icon={MessageSquare} label="Send Feedback" />
         </div>
-        
+
         {!collapsed && (
           <div className="text-xs text-muted-foreground mt-6 px-2">
             <p>© 2023 EduTube LMS</p>

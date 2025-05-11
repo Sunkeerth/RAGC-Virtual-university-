@@ -4,12 +4,12 @@ import { Header } from '@/components/header';
 import { Sidebar } from '@/components/sidebar';
 import { BranchCard } from '@/components/branch-card';
 import { Loader2 } from 'lucide-react';
-import { Branch } from '@shared/schema';
+import { IBranch } from '@shared/schema';
 
 export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
-  const { data: branches, isLoading, error } = useQuery<Branch[]>({
+  const { data: branches, isLoading, error } = useQuery<IBranch[]>({
     queryKey: ['/api/branches'],
   });
   

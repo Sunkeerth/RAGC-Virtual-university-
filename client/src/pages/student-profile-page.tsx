@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Branch, Video, VrSession, Payment } from '@shared/schema';
+import { IBranch, IVideo, IVrSession, IPayment } from '@shared/schema';
 import { useLocation } from 'wouter';
 
 export default function StudentProfilePage() {
@@ -22,120 +22,126 @@ export default function StudentProfilePage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<IVideo | null>(null);
   const [videoPlayerOpen, setVideoPlayerOpen] = useState(false);
-  
-  // Fetch enrolled branches (convert IDs to actual branch data)
-  const { data: allBranches, isLoading: branchesLoading } = useQuery<Branch[]>({
-    queryKey: ['/api/branches'],
+
+  // Fetch all branches
+  const { data: allBranches, isLoading: branchesLoading } = useQuery<IBranch[]>({
+    queryKey: ['branches'],
+    queryFn: async () => {
+      const res = await fetch('/api/branches', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch branches');
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 5 // 5 minutes
   });
-  
-  // Fetch user's VR sessions
-  const { data: vrSessions, isLoading: sessionsLoading } = useQuery<VrSession[]>({
-    queryKey: ['/api/vr-sessions'],
+
+  // Fetch VR sessions
+  const { data: vrSessions, isLoading: sessionsLoading } = useQuery<IVrSession[]>({
+    queryKey: ['vr-sessions'],
+    queryFn: async () => {
+      const res = await fetch('/api/vr-sessions', { credentials: 'include' });
+      return res.ok ? await res.json() : [];
+    }
   });
-  
-  // Fetch user's payment history
-  const { data: payments, isLoading: paymentsLoading } = useQuery<Payment[]>({
-    queryKey: ['/api/user/payments'],
+
+  // Fetch payments with error handling
+  const { data: payments, isLoading: paymentsLoading } = useQuery<IPayment[]>({
+    queryKey: ['user-payments'],
     queryFn: async () => {
       try {
-        const res = await fetch('/api/user/payments', {
+        const res = await fetch('/api/user/payments', { 
           credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
         });
         
-        if (res.ok) {
-          return await res.json();
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text.startsWith('{') ? JSON.parse(text).message : text);
         }
         
-        // For demo purposes, if endpoint doesn't exist, return empty array
-        return [];
+        return await res.json();
       } catch (error) {
-        console.error('Error fetching payments:', error);
+        toast({
+          title: "Payment Error",
+          description: error instanceof Error ? error.message : "Failed to load payments",
+          variant: "destructive"
+        });
         return [];
       }
-    },
+    }
   });
-  
-  // Fetch videos from enrolled branches
-  const { data: videos, isLoading: videosLoading } = useQuery<Video[]>({
-    queryKey: ['/api/user/videos'],
+
+  // Fetch videos with proper null checks
+  const { data: videos = [], isLoading: videosLoading } = useQuery<IVideo[]>({
+    queryKey: ['user-videos', user?.enrolledBranches],
     queryFn: async () => {
+      if (!user?.enrolledBranches?.length) return [];
+      
       try {
-        // Try to fetch videos from enrolled branches
-        if (user?.enrolledBranches && user.enrolledBranches.length > 0) {
-          const branchId = user.enrolledBranches[0];
-          const res = await fetch(`/api/branches/${branchId}/videos`, {
-            credentials: 'include',
-          });
-          
-          if (res.ok) {
-            return await res.json();
-          }
-        }
-        
-        // For demo purposes, if no enrolled branches or fetch fails, return empty array
-        return [];
+        const branchId = user.enrolledBranches[0];
+        const res = await fetch(`/api/branches/${branchId}/videos`, { 
+          credentials: 'include' 
+        });
+        return res.ok ? await res.json() : [];
       } catch (error) {
-        console.error('Error fetching videos:', error);
+        console.error('Video fetch error:', error);
         return [];
       }
     },
-    enabled: !!user?.enrolledBranches && user.enrolledBranches.length > 0,
+    enabled: !!user?.enrolledBranches?.length
   });
-  
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-  
-  const handleVideoClick = (video: Video) => {
+
+  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+
+  const handleVideoClick = (video: IVideo) => {
     setSelectedVideo(video);
     setVideoPlayerOpen(true);
   };
-  
-  // Get user's enrolled branches
-  const enrolledBranches = user?.enrolledBranches && allBranches 
-    ? allBranches.filter(branch => user.enrolledBranches.includes(branch.id))
-    : [];
-  
-  // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+
+  const enrolledBranches = (user?.enrolledBranches || [])
+    .map(branchId => allBranches?.find(b => b.id === branchId))
+    .filter(Boolean) as IBranch[];
+
+  const formatDate = (dateString: string | Date) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
-  
-  // Get name initials for avatar
-  const getInitials = (name: string) => {
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
     const parts = name.split(' ');
-    if (parts.length > 1) {
-      return `${parts[0][0]}${parts[1][0]}`;
-    }
-    return name.substring(0, 2).toUpperCase();
+    return parts.length > 1 
+      ? `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+      : name.substring(0, 2).toUpperCase();
   };
-  
+
   const isLoading = branchesLoading || sessionsLoading || paymentsLoading || videosLoading;
-  
+
   return (
     <div className="h-screen flex flex-col bg-background">
       <Header onToggleSidebar={toggleSidebar} />
       
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
         <div className={`${sidebarOpen ? 'block' : 'hidden'} lg:block`}>
           <Sidebar />
         </div>
-        
-        {/* Main content */}
+
         <main className="flex-1 overflow-y-auto bg-background pb-8">
           <div className="p-6">
+            {/* Profile Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
               <div className="flex items-center">
                 <Avatar className="h-16 w-16 mr-4">
                   <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-                    {user?.name ? getInitials(user.name) : 'U'}
+                    {getInitials(user?.name)}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h1 className="text-2xl font-bold">{user?.name}</h1>
+                  <h1 className="text-2xl font-bold">{user?.name || 'Student'}</h1>
                   <p className="text-muted-foreground">
                     {user?.studentId ? (
                       <span className="flex items-center">
@@ -156,14 +162,15 @@ export default function StudentProfilePage() {
                 <Button variant="outline" onClick={() => navigate('/settings')}>
                   Edit Profile
                 </Button>
-                {user?.enrolledBranches?.length === 0 && (
+                {!user?.enrolledBranches?.length && (
                   <Button onClick={() => navigate('/')}>
                     Explore Courses
                   </Button>
                 )}
               </div>
             </div>
-            
+
+            {/* Main Content Tabs */}
             <Tabs defaultValue="courses">
               <TabsList className="mb-6">
                 <TabsTrigger value="courses">My Courses</TabsTrigger>
@@ -171,7 +178,8 @@ export default function StudentProfilePage() {
                 <TabsTrigger value="vr">VR Lab Sessions</TabsTrigger>
                 <TabsTrigger value="payments">Payment History</TabsTrigger>
               </TabsList>
-              
+
+              {/* Courses Tab */}
               <TabsContent value="courses">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
@@ -202,16 +210,19 @@ export default function StudentProfilePage() {
                         <div className="sm:flex">
                           <div className="sm:w-1/3 md:w-1/4 h-48 sm:h-auto">
                             <img 
-                              src={branch.image} 
+                              src={branch.image || '/fallback-image.jpg'}
                               alt={branch.name}
                               className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/fallback-image.jpg';
+                              }}
                             />
                           </div>
                           <div className="p-6 sm:w-2/3 md:w-3/4">
                             <h2 className="text-xl font-bold mb-2">{branch.name}</h2>
                             <div className="flex items-center text-sm text-muted-foreground mb-4">
                               <Calendar className="h-4 w-4 mr-1" />
-                              <span>Enrolled: {formatDate(new Date().toISOString())}</span> {/* Demo date */}
+                              <span>Enrolled: {formatDate(new Date())}</span>
                               <span className="mx-2">•</span>
                               <GraduationCap className="h-4 w-4 mr-1" />
                               <span>{branch.teachersCount} Teachers</span>
@@ -222,7 +233,7 @@ export default function StudentProfilePage() {
                             <div className="mb-4">
                               <div className="flex justify-between text-sm mb-1">
                                 <span>Course Progress</span>
-                                <span>25%</span> {/* Demo progress */}
+                                <span>25%</span>
                               </div>
                               <Progress value={25} className="h-2" />
                             </div>
@@ -243,7 +254,7 @@ export default function StudentProfilePage() {
                                 VR Lab
                               </Button>
                               <Badge variant="outline" className="flex items-center">
-                                <span className="bg-primary/20 rounded-full h-2 w-2 mr-1"></span>
+                                <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
                                 In Progress
                               </Badge>
                             </div>
@@ -254,13 +265,14 @@ export default function StudentProfilePage() {
                   </div>
                 )}
               </TabsContent>
-              
+
+              {/* Videos Tab */}
               <TabsContent value="videos">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
-                ) : !videos || videos.length === 0 ? (
+                ) : videos.length === 0 ? (
                   <Card className="text-center p-8">
                     <CardHeader>
                       <CardTitle>No Videos Available</CardTitle>
@@ -289,13 +301,14 @@ export default function StudentProfilePage() {
                   </div>
                 )}
               </TabsContent>
-              
+
+              {/* VR Sessions Tab */}
               <TabsContent value="vr">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
-                ) : !vrSessions || vrSessions.length === 0 ? (
+                ) : !vrSessions?.length ? (
                   <Card className="text-center p-8">
                     <CardHeader>
                       <CardTitle>No VR Lab Sessions</CardTitle>
@@ -319,7 +332,7 @@ export default function StudentProfilePage() {
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center">
-                              <h3 className="font-medium">Equipment #{session.equipmentId}</h3>
+                              <h3 className="font-medium">Equipment #{session.equipmentId.toString()}</h3>
                               {session.completed && (
                                 <Badge className="ml-2 bg-green-500/10 text-green-500 hover:bg-green-500/20">
                                   <CheckCircle className="h-3 w-3 mr-1" />
@@ -345,7 +358,10 @@ export default function StudentProfilePage() {
                               <Timer className="h-4 w-4 mr-1" />
                               <span>
                                 {session.endTime ? 
-                                  `Duration: ${Math.floor((new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / 60000)} min` : 
+                                  `Duration: ${Math.floor((
+                                    new Date(session.endTime).getTime() - 
+                                    new Date(session.startTime).getTime()
+                                  ) / 60000)} min` : 
                                   'Session in progress'}
                               </span>
                             </div>
@@ -364,13 +380,14 @@ export default function StudentProfilePage() {
                   </div>
                 )}
               </TabsContent>
-              
+
+              {/* Payments Tab */}
               <TabsContent value="payments">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
-                ) : !payments || payments.length === 0 ? (
+                ) : payments?.length === 0 ? (
                   <Card className="text-center p-8">
                     <CardHeader>
                       <CardTitle>No Payment History</CardTitle>
@@ -403,8 +420,7 @@ export default function StudentProfilePage() {
                         </div>
                         
                         <div className="divide-y">
-                          {payments.map((payment) => {
-                            // Find branch name
+                          {payments?.map((payment) => {
                             const branch = allBranches?.find(b => b.id === payment.branchId);
                             
                             return (
@@ -442,8 +458,7 @@ export default function StudentProfilePage() {
           </div>
         </main>
       </div>
-      
-      {/* Video player modal */}
+
       <VideoPlayer
         video={selectedVideo}
         open={videoPlayerOpen}

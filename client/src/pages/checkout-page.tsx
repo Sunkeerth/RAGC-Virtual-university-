@@ -6,18 +6,18 @@ import { PaymentForm } from '@/components/payment-form';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Loader2, Home, CreditCard } from 'lucide-react';
 import { calculateInstallment } from '@/lib/utils';
-import { Branch } from '@shared/schema';
+import { IBranch } from '@shared/schema';
 
 interface BranchData {
-  branch: Branch;
+  branch: IBranch;
 }
 
 export default function CheckoutPage() {
   const { branchId, installment } = useParams();
   const [, navigate] = useLocation();
   
-  const branchIdNum = parseInt(branchId);
-  const installmentNum = parseInt(installment);
+  const branchIdNum = parseInt(branchId || '0');
+  const installmentNum = parseInt(installment || '0');
   
   // Fetch branch data
   const { data: branchData, isLoading } = useQuery<BranchData>({

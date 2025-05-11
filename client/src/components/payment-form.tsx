@@ -10,8 +10,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2 } from 'lucide-react';
 
-// Initialize Stripe with public key from environment
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || 'pk_test_TYooMQauvdEDq54NiTphI7jx');
+// Initialize Stripe with error handling
+const stripePromise = loadStripe(
+  import.meta.env.VITE_STRIPE_PUBLIC_KEY || 'pk_test_TYooMQauvdEDq54NiTphI7jx',
+  {
+    betas: ['process_order_beta_3'],
+    locale: 'en'
+  }
+).catch((error) => {
+  console.error('Failed to initialize Stripe:', error);
+  return null;
+});
 
 interface PaymentFormProps {
   branchId: number;
@@ -21,7 +30,11 @@ interface PaymentFormProps {
   className?: string;
 }
 
-const CheckoutForm = ({ amount, branchName, installmentNumber }: { 
+const CheckoutForm = ({ 
+  amount, 
+  branchName, 
+  installmentNumber 
+}: { 
   amount: number; 
   branchName: string; 
   installmentNumber: number;
@@ -30,8 +43,9 @@ const CheckoutForm = ({ amount, branchName, installmentNumber }: {
   const elements = useElements();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
   const [, navigate] = useLocation();
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -40,6 +54,7 @@ const CheckoutForm = ({ amount, branchName, installmentNumber }: {
     }
     
     setIsLoading(true);
+    setNetworkError(false);
     
     try {
       const { error } = await stripe.confirmPayment({
@@ -66,23 +81,38 @@ const CheckoutForm = ({ amount, branchName, installmentNumber }: {
         description: "Thank you for your enrollment!",
       });
       
-      // Navigate to profile page after successful payment
       navigate('/profile');
-      
-      // Invalidate relevant queries to refresh data
-      queryClient.invalidateQueries({
-        queryKey: ['/api/user'],
-      });
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
     } catch (err) {
+      setNetworkError(true);
       toast({
-        title: "Payment Error",
-        description: "An unexpected error occurred. Please try again.",
+        title: "Network Error",
+        description: "Connection failed. Please check your internet.",
         variant: "destructive",
       });
+    } finally {
       setIsLoading(false);
     }
   };
-  
+
+  const handleRetry = () => {
+    window.location.reload();
+  };
+
+  if (networkError) {
+    return (
+      <div className="text-center p-6">
+        <p className="text-red-500 mb-2">Connection Lost</p>
+        <p className="text-sm text-muted-foreground mb-4">
+          Please check your internet connection and try again
+        </p>
+        <Button className="outline" onClick={handleRetry}>
+          Retry Payment
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit}>
       <div className="text-center mb-6">
@@ -96,7 +126,14 @@ const CheckoutForm = ({ amount, branchName, installmentNumber }: {
       </div>
       
       <div className="mb-6">
-        <PaymentElement />
+        <PaymentElement options={{
+          fields: {
+            billingDetails: {
+              email: 'never',
+              phone: 'never',
+            }
+          }
+        }} />
       </div>
       
       <Button 
@@ -114,7 +151,7 @@ const CheckoutForm = ({ amount, branchName, installmentNumber }: {
         )}
       </Button>
       
-      <p className="text-center text-xs text-muted-foreground mt-4 flex items-center justify-center">
+      <p className="text-center text-xs text-muted-foreground mt-4">
         <span className="material-icons text-muted-foreground mr-1 text-sm">lock</span>
         Secure payment processed by Stripe
       </p>
@@ -130,43 +167,61 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   className,
 }) => {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [stripeLoaded, setStripeLoaded] = useState(false);
+  const [initializationError, setInitializationError] = useState(false);
   const { toast } = useToast();
-  
+
   useEffect(() => {
-    // Create payment intent when component loads
+    // Check Stripe initialization status
+    stripePromise?.then(() => setStripeLoaded(true)).catch(() => {
+      setInitializationError(true);
+    });
+  }, []);
+
+  useEffect(() => {
     const createPaymentIntent = async () => {
       try {
         const response = await apiRequest(
           "POST", 
           "/api/create-payment-intent", 
-          { 
-            branchId,
-            installmentNumber,
-          }
+          { branchId, installmentNumber }
         );
         
         const data = await response.json();
         setClientSecret(data.clientSecret);
       } catch (error) {
         toast({
-          title: "Error",
-          description: "Failed to initialize payment. Please try again.",
+          title: "Initialization Error",
+          description: "Failed to start payment process",
           variant: "destructive",
         });
       }
     };
-    
-    createPaymentIntent();
-  }, [branchId, installmentNumber, toast]);
-  
-  if (!clientSecret) {
+
+    if (stripeLoaded) {
+      createPaymentIntent();
+    }
+  }, [branchId, installmentNumber, toast, stripeLoaded]);
+
+  if (initializationError) {
+    return (
+      <div className="text-center p-6">
+        <p className="text-red-500 mb-2">Payment System Unavailable</p>
+        <p className="text-sm text-muted-foreground">
+          Please try again later or contact support
+        </p>
+      </div>
+    );
+  }
+
+  if (!clientSecret || !stripeLoaded) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
-  
+
   return (
     <Card className={className}>
       <CardHeader>
@@ -192,13 +247,13 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
           
           <TabsContent value="upi">
             <div className="text-center py-8">
-              <p className="text-muted-foreground">UPI payment option will be available soon.</p>
+              <p className="text-muted-foreground">UPI payments coming soon</p>
             </div>
           </TabsContent>
           
           <TabsContent value="netbanking">
             <div className="text-center py-8">
-              <p className="text-muted-foreground">Net Banking option will be available soon.</p>
+              <p className="text-muted-foreground">Net Banking coming soon</p>
             </div>
           </TabsContent>
         </Tabs>

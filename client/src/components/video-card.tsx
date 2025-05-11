@@ -2,11 +2,11 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Play, ThumbsUp, Eye, Lock } from 'lucide-react';
-import { Video } from '@shared/schema';
+import { IVideo } from '@shared/schema';
 
 interface VideoCardProps {
-  video: Video;
-  onClick: (video: Video) => void;
+  video: IVideo;
+  onClick: (video: IVideo) => void;
   className?: string;
   restrictedAccess?: boolean;
 }

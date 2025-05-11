@@ -7,7 +7,7 @@ import { BranchDetails } from '@/components/branch-details';
 import { VideoCard } from '@/components/video-card';
 import { VideoPlayer } from '@/components/video-player';
 import { Loader2 } from 'lucide-react';
-import { Branch, EquipmentKit, Specialization, Video } from '@shared/schema';
+import { IBranch as Branch, IEquipmentKit as EquipmentKit, ISpecialization as Specialization, IVideo as Video } from '@shared/schema';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface BranchData {
@@ -18,20 +18,35 @@ interface BranchData {
 
 export default function BranchPage() {
   const { id } = useParams();
-  const branchId = parseInt(id);
+  const branchId = parseInt(id || '0');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
   const [videoPlayerOpen, setVideoPlayerOpen] = useState(false);
   
   // Fetch branch data
   const { data: branchData, isLoading: branchLoading } = useQuery<BranchData>({
-    queryKey: [`/api/branches/${branchId}`],
+    queryKey: ['branch', branchId],
+    queryFn: async () => {
+      const res = await fetch(`/api/branches/${branchId}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to fetch branch data');
+      return res.json();
+    },
+    enabled: !!branchId && !isNaN(branchId)
   });
   
   // Fetch branch videos
   const { data: videos, isLoading: videosLoading } = useQuery<Video[]>({
-    queryKey: [`/api/branches/${branchId}/videos`],
-    enabled: !!branchId,
+    queryKey: ['branch-videos', branchId],
+    queryFn: async () => {
+      const res = await fetch(`/api/branches/${branchId}/videos`, {
+        credentials: 'include'
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!branchId && !isNaN(branchId)
   });
   
   const toggleSidebar = () => {
@@ -96,7 +111,7 @@ export default function BranchPage() {
                           key={video.id} 
                           video={video} 
                           onClick={handleVideoClick}
-                          restrictedAccess={video.restrictedAccess}
+                          restrictedAccess={video.restrictedAccess ?? undefined}
                         />
                       ))}
                     </div>

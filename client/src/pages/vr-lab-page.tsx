@@ -39,7 +39,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { EquipmentKit, VrSession } from '@shared/schema';
+import { IEquipmentKit as EquipmentKit, IVrSession as VrSession } from '@shared/schema';
 
 interface SessionData {
   equipmentId: number;
@@ -169,7 +169,7 @@ export default function VrLabPage() {
     if (activeSession) {
       // Find the session ID from active sessions
       const activeVrSession = sessions?.find(s => 
-        s.equipmentId === activeSession.equipmentId && 
+        s.equipmentId.toString() === activeSession.equipmentId.toString() && 
         !s.endTime
       );
       
@@ -210,7 +210,7 @@ export default function VrLabPage() {
     
     // Find the most recent session for this equipment
     const equipmentSessions = sessions
-      .filter(session => session.equipmentId === equipmentId)
+      .filter(session => session.equipmentId.toString() === equipmentId.toString())
       .sort((a, b) => (new Date(b.startTime).getTime() - new Date(a.startTime).getTime()));
     
     return equipmentSessions[0] || null;
@@ -366,7 +366,7 @@ export default function VrLabPage() {
                             
                             <div className="p-4 md:border-l md:border-t-0 border-t border-border flex items-center justify-center">
                               <Button
-                                onClick={() => startVRExperience(session.equipmentId)}
+                                onClick={() => startVRExperience(Number(session.equipmentId))}
                                 variant="outline"
                                 className="flex items-center"
                               >
@@ -495,10 +495,12 @@ export default function VrLabPage() {
 // Badge component for session status
 const Badge = ({ 
   children, 
-  variant = 'default' 
+  variant = 'default', 
+  className = '' 
 }: { 
   children: React.ReactNode; 
-  variant?: 'default' | 'success' | 'warning' | 'error';
+  variant?: 'default' | 'success' | 'warning' | 'error'; 
+  className?: string;
 }) => {
   const variants = {
     default: 'bg-primary/10 text-primary',
@@ -508,7 +510,7 @@ const Badge = ({
   };
   
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${variants[variant]}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${variants[variant]} ${className}`}>
       {children}
     </span>
   );

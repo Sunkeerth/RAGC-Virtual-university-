@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { Redirect } from 'wouter';
+import { Redirect, useLocation } from 'wouter';
 import { Logo } from '@/components/logo';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -26,13 +26,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Login form schema
 const loginSchema = z.object({
@@ -59,6 +54,9 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
+  const { toast } = useToast();
+  const [location, navigate] = useLocation();
+  const queryClient = useQueryClient();
   const { user, loginMutation, registerMutation } = useAuth();
   const [activeTab, setActiveTab] = useState('login');
   
@@ -97,11 +95,28 @@ export default function AuthPage() {
   };
   
   // Handle register form submission
-  const onRegisterSubmit = (values: RegisterFormValues) => {
-    const { confirmPassword, ...registerData } = values;
-    registerMutation.mutate(registerData);
+  const onRegisterSubmit = async (values: RegisterFormValues) => {
+    try {
+      const { confirmPassword, ...registerData } = values;
+      await registerMutation.mutateAsync(registerData);
+      
+      navigate('/documents');
+      
+      toast({
+        title: "Registration Successful",
+        description: "You can now log in to your account",
+      });
+      setActiveTab('login');
+      registerForm.reset();
+    } catch (error) {
+      toast({
+        title: "Registration Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive"
+      });
+    }
   };
-  
+
   return (
     <div className="grid lg:grid-cols-2 min-h-screen">
       {/* Left side - Auth forms */}
@@ -357,6 +372,7 @@ export default function AuthPage() {
                         <input
                           type="checkbox"
                           id="terms"
+                          required
                           className="rounded border-border"
                         />
                         <Label htmlFor="terms" className="text-sm text-muted-foreground">

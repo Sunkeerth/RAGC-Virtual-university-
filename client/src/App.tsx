@@ -13,17 +13,22 @@ import TeacherPage from "@/pages/teacher-page";
 import StudentProfilePage from "@/pages/student-profile-page";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { AuthProvider } from "@/hooks/use-auth";
+import { DocumentUpload } from "@/components/DocumentUpload";
 
 function Router() {
   return (
-    <Switch>
-      <ProtectedRoute path="/" component={HomePage} />
-      <Route path="/auth" component={AuthPage} />
+    <Switch>  
+    <ProtectedRoute path="/" component={HomePage} />
+      
+    <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/branch/:id" component={BranchPage} />
+      <ProtectedRoute path="/documents" component={DocumentUpload} />
       <ProtectedRoute path="/checkout/:branchId/:installment" component={CheckoutPage} />
       <ProtectedRoute path="/vr-lab" component={VrLabPage} />
       <ProtectedRoute path="/teacher" component={TeacherPage} />
       <ProtectedRoute path="/profile" component={StudentProfilePage} />
+      {/* <ProtectedRoute path="/documents" component={DocumentUpload} /> */}
+
       <Route component={NotFound} />
     </Switch>
   );

@@ -24,7 +24,7 @@ export const Logo: React.FC<LogoProps> = ({ className, size = 'md' }) => {
   return (
     <Link href="/" className={cn('flex items-center', className)}>
         <PlayCircle className={cn('text-primary mr-1', iconSizes[size])} />
-        <span className={cn('font-bold', textSizes[size])}>EduTube</span>
+        <span className={cn('font-bold', textSizes[size])}>RAGC</span>
     </Link>
   );
 };

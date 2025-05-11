@@ -3,7 +3,7 @@ import { cn, formatCurrency, calculateInstallment } from '@/lib/utils';
 import { CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'wouter';
-import { Branch, EquipmentKit, Specialization } from '@shared/schema';
+import { IBranch as Branch, IEquipmentKit as EquipmentKit, ISpecialization as Specialization } from '@shared/schema';
 
 interface BranchDetailsProps {
   branch: Branch;

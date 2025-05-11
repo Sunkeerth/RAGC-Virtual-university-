@@ -1,753 +1,331 @@
-import { 
-  users, type User, type InsertUser,
-  branches, type Branch, type InsertBranch,
-  equipmentKits, type EquipmentKit, type InsertEquipmentKit,
-  specializations, type Specialization, type InsertSpecialization,
-  payments, type Payment, type InsertPayment,
-  videos, type Video, type InsertVideo,
-  vrSessions, type VrSession, type InsertVrSession
-} from "@shared/schema";
-import createMemoryStore from "memorystore";
+import mongoose, { Schema, Types } from "mongoose";
 import session from "express-session";
+import MongoStore from "connect-mongo";
 import { generateId } from "./utils";
+import {
+  type IUser,
+  type InsertUser,
+  type IBranch,
+  type InsertBranch,
+  type IEquipmentKit,
+  type InsertEquipmentKit,
+  type ISpecialization,
+  type InsertSpecialization,
+  type IPayment,
+  type InsertPayment,
+  type IVideo,
+  type InsertVideo,
+  type IVrSession,
+  type InsertVrSession
+} from "@shared/models";
 
-const MemoryStore = createMemoryStore(session);
+// ---- 1) Document Interfaces & Schemas ----
 
-// Interface for storage operations
-export interface IStorage {
-  // User operations
-  getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  getUserByEmail(email: string): Promise<User | undefined>;
-  getUserByStudentId(studentId: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  updateUser(id: number, user: Partial<User>): Promise<User>;
-  
-  // Branch operations
-  getBranch(id: number): Promise<Branch | undefined>;
-  getBranches(): Promise<Branch[]>;
-  createBranch(branch: InsertBranch): Promise<Branch>;
-  
-  // Equipment kit operations
-  getEquipmentKitsByBranchId(branchId: number): Promise<EquipmentKit[]>;
-  createEquipmentKit(kit: InsertEquipmentKit): Promise<EquipmentKit>;
-  
-  // Specialization operations
-  getSpecializationsByBranchId(branchId: number): Promise<Specialization[]>;
-  createSpecialization(specialization: InsertSpecialization): Promise<Specialization>;
-  
-  // Payment operations
-  createPayment(payment: InsertPayment): Promise<Payment>;
-  getPaymentsByUserId(userId: number): Promise<Payment[]>;
-  
-  // Video operations
-  getVideosByBranchId(branchId: number): Promise<Video[]>;
-  getVideosByTeacherId(teacherId: number): Promise<Video[]>;
-  createVideo(video: InsertVideo): Promise<Video>;
-  
-  // VR Session operations
-  createVrSession(session: InsertVrSession): Promise<VrSession>;
-  updateVrSession(id: number, session: Partial<VrSession>): Promise<VrSession>;
-  getVrSessionsByUserId(userId: number): Promise<VrSession[]>;
-  
-  // Generate unique student ID
-  generateStudentId(): string;
-
-  // Session store
-  sessionStore: session.Store;
+interface IUserDoc extends mongoose.Document {
+  _id: Types.ObjectId;
+  username: string;
+  email: string;
+  studentId?: string;
+  password: string;
+  role: "student" | "teacher" | "admin";
+  enrolledBranches: Array<Types.ObjectId>;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-// Memory storage implementation
-export class MemStorage implements IStorage {
-  private usersMap: Map<number, User>;
-  private branchesMap: Map<number, Branch>;
-  private equipmentKitsMap: Map<number, EquipmentKit>;
-  private specializationsMap: Map<number, Specialization>;
-  private paymentsMap: Map<number, Payment>;
-  private videosMap: Map<number, Video>;
-  private vrSessionsMap: Map<number, VrSession>;
-  
-  // Current IDs for auto-increment
-  private userCurrentId: number;
-  private branchCurrentId: number;
-  private kitCurrentId: number;
-  private specializationCurrentId: number;
-  private paymentCurrentId: number;
-  private videoCurrentId: number;
-  private sessionCurrentId: number;
-  
-  // Session store
-  sessionStore: session.Store;
-  
-  constructor() {
-    // Initialize maps
-    this.usersMap = new Map();
-    this.branchesMap = new Map();
-    this.equipmentKitsMap = new Map();
-    this.specializationsMap = new Map();
-    this.paymentsMap = new Map();
-    this.videosMap = new Map();
-    this.vrSessionsMap = new Map();
-    
-    // Initialize IDs
-    this.userCurrentId = 1;
-    this.branchCurrentId = 1;
-    this.kitCurrentId = 1;
-    this.specializationCurrentId = 1;
-    this.paymentCurrentId = 1;
-    this.videoCurrentId = 1;
-    this.sessionCurrentId = 1;
-    
-    // Initialize session store
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000 // 24 hours
-    });
-    
-    // Create initial branches
-    this.seedBranches();
+const UserSchema = new Schema<IUserDoc>({
+  username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  studentId: { type: String, unique: true, sparse: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ["student", "teacher", "admin"], default: "student" },
+  enrolledBranches: [{ type: Schema.Types.ObjectId, ref: "Branch", default: [] }],
+}, { timestamps: true });
+
+interface IBranchDoc extends mongoose.Document {
+  _id: Types.ObjectId;
+  name: string;
+  description?: string;
+  location?: string;
+  image?: string;
+  price?: number;
+  studentsCount?: number;
+  teachersCount?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const BranchSchema = new Schema<IBranchDoc>({
+  name: { type: String, required: true },
+  description: String,
+  location: String,
+  image: String,
+  price: Number,
+  studentsCount: Number,
+  teachersCount: Number,
+}, { timestamps: true });
+
+interface IEquipmentKitDoc extends mongoose.Document {
+  _id: Types.ObjectId;
+  branchId: Types.ObjectId;
+  name?: string;
+  description?: string;
+  icon?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const EquipmentKitSchema = new Schema<IEquipmentKitDoc>({
+  branchId: { type: Schema.Types.ObjectId, ref: "Branch", required: true },
+  name: String,
+  description: String,
+  icon: String,
+}, { timestamps: true });
+
+interface ISpecializationDoc extends mongoose.Document {
+  _id: Types.ObjectId;
+  branchId: Types.ObjectId;
+  name?: string;
+  description?: string;
+  teachersCount?: number;
+  modulesCount?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const SpecializationSchema = new Schema<ISpecializationDoc>({
+  branchId: { type: Schema.Types.ObjectId, ref: "Branch", required: true },
+  name: String,
+  description: String,
+  teachersCount: Number,
+  modulesCount: Number,
+}, { timestamps: true });
+
+interface IVideoDoc extends mongoose.Document {
+  _id: Types.ObjectId;
+  branchId: Types.ObjectId;
+  teacherId: Types.ObjectId;
+  title?: string;
+  url?: string;
+  description?: string;
+  tags?: string[];
+  restrictedAccess?: boolean;
+  views?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const VideoSchema = new Schema<IVideoDoc>({
+  branchId: { type: Schema.Types.ObjectId, ref: "Branch", required: true },
+  teacherId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  title: String,
+  url: String,
+  description: String,
+  tags: { type: [String], default: [] },
+  restrictedAccess: { type: Boolean, default: false },
+  views: { type: Number, default: 0 },
+}, { timestamps: true });
+
+interface IVrSessionDoc extends mongoose.Document {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId;
+  equipmentId: Types.ObjectId;
+  progress?: number;
+  completed?: boolean;
+  startTime?: Date;
+  endTime?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const VrSessionSchema = new Schema<IVrSessionDoc>({
+  userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  equipmentId: { type: Schema.Types.ObjectId, ref: "EquipmentKit", required: true },
+  progress: Number,
+  completed: Boolean,
+  startTime: { type: Date, default: () => new Date() },
+  endTime: Date,
+}, { timestamps: true });
+
+interface IPaymentDoc extends mongoose.Document {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId;
+  branchId: Types.ObjectId;
+  amount?: number;
+  installmentNumber?: number;
+  status?: "pending" | "completed";
+  stripePaymentId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const PaymentSchema = new Schema<IPaymentDoc>({
+  userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  branchId: { type: Schema.Types.ObjectId, ref: "Branch", required: true },
+  amount: Number,
+  installmentNumber: Number,
+  status: { type: String, enum: ["pending", "completed"], default: "pending" },
+  stripePaymentId: String,
+}, { timestamps: true });
+
+// ---- 2) Models ----
+
+const UserModel = mongoose.model<IUserDoc>("User", UserSchema);
+const BranchModel = mongoose.model<IBranchDoc>("Branch", BranchSchema);
+const EquipmentKitModel = mongoose.model<IEquipmentKitDoc>("EquipmentKit", EquipmentKitSchema);
+const SpecializationModel = mongoose.model<ISpecializationDoc>("Specialization", SpecializationSchema);
+const VideoModel = mongoose.model<IVideoDoc>("Video", VideoSchema);
+const VrSessionModel = mongoose.model<IVrSessionDoc>("VrSession", VrSessionSchema);
+const PaymentModel = mongoose.model<IPaymentDoc>("Payment", PaymentSchema);
+
+// ---- 3) Storage Class ----
+
+export class MongoStorage {
+  sessionStore = MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,
+    collectionName: "sessions"
+  });
+
+  // User methods
+  async getUser(id: string) {
+    return UserModel.findById(new Types.ObjectId(id)).lean().exec();
   }
-  
-  // User operations
-  async getUser(id: number): Promise<User | undefined> {
-    return this.usersMap.get(id);
+
+  async getUserByUsername(username: string) {
+    return UserModel.findOne({ username }).lean().exec();
   }
-  
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.usersMap.values()).find(
-      (user) => user.username === username
-    );
+
+  async getUserByEmail(email: string) {
+    return UserModel.findOne({ email }).lean().exec();
   }
-  
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.usersMap.values()).find(
-      (user) => user.email === email
-    );
+
+  async getUserByStudentId(studentId: string) {
+    return UserModel.findOne({ studentId }).lean().exec();
   }
-  
-  async getUserByStudentId(studentId: string): Promise<User | undefined> {
-    return Array.from(this.usersMap.values()).find(
-      (user) => user.studentId === studentId
-    );
-  }
-  
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.userCurrentId++;
-    const user: User = { ...insertUser, id };
-    this.usersMap.set(id, user);
-    return user;
-  }
-  
-  async updateUser(id: number, updateData: Partial<User>): Promise<User> {
-    const user = await this.getUser(id);
-    if (!user) {
-      throw new Error(`User with ID ${id} not found`);
+
+  async createUser(data: InsertUser) {
+    if (data.role === "student" && !data.studentId) {
+      data.studentId = this.generateStudentId();
     }
-    
-    const updatedUser = { ...user, ...updateData };
-    this.usersMap.set(id, updatedUser);
-    return updatedUser;
+    const user = await UserModel.create(data);
+    return user.toObject();
   }
-  
-  // Branch operations
-  async getBranch(id: number): Promise<Branch | undefined> {
-    return this.branchesMap.get(id);
+
+  async updateUser(id: string, data: Partial<IUser>) {
+    const updated = await UserModel.findByIdAndUpdate(
+      new Types.ObjectId(id),
+      data,
+      { new: true }
+    ).lean().exec();
+    return updated;
   }
-  
-  async getBranches(): Promise<Branch[]> {
-    return Array.from(this.branchesMap.values());
+
+  // Branch methods
+  async getBranch(id: string) {
+    return BranchModel.findById(new Types.ObjectId(id)).lean().exec();
   }
-  
-  async createBranch(insertBranch: InsertBranch): Promise<Branch> {
-    const id = this.branchCurrentId++;
-    const branch: Branch = { ...insertBranch, id };
-    this.branchesMap.set(id, branch);
-    return branch;
+
+  async getBranches() {
+    return BranchModel.find().lean().exec();
   }
-  
-  // Equipment kit operations
-  async getEquipmentKitsByBranchId(branchId: number): Promise<EquipmentKit[]> {
-    return Array.from(this.equipmentKitsMap.values()).filter(
-      (kit) => kit.branchId === branchId
-    );
+
+  async createBranch(data: InsertBranch) {
+    const branch = await BranchModel.create(data);
+    return branch.toObject();
   }
-  
-  async createEquipmentKit(insertKit: InsertEquipmentKit): Promise<EquipmentKit> {
-    const id = this.kitCurrentId++;
-    const kit: EquipmentKit = { ...insertKit, id };
-    this.equipmentKitsMap.set(id, kit);
-    return kit;
+
+  // EquipmentKit methods
+  async getEquipmentKitsByBranchId(branchId: string) {
+    return EquipmentKitModel.find({ 
+      branchId: new Types.ObjectId(branchId) 
+    }).lean().exec();
   }
-  
-  // Specialization operations
-  async getSpecializationsByBranchId(branchId: number): Promise<Specialization[]> {
-    return Array.from(this.specializationsMap.values()).filter(
-      (spec) => spec.branchId === branchId
-    );
+
+  async createEquipmentKit(data: InsertEquipmentKit) {
+    const kit = await EquipmentKitModel.create(data);
+    return kit.toObject();
   }
-  
-  async createSpecialization(insertSpec: InsertSpecialization): Promise<Specialization> {
-    const id = this.specializationCurrentId++;
-    const specialization: Specialization = { ...insertSpec, id };
-    this.specializationsMap.set(id, specialization);
-    return specialization;
+
+  // Specialization methods
+  async getSpecializationsByBranchId(branchId: string) {
+    return SpecializationModel.find({ 
+      branchId: new Types.ObjectId(branchId) 
+    }).lean().exec();
   }
-  
-  // Payment operations
-  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
-    const id = this.paymentCurrentId++;
-    const payment: Payment = { 
-      ...insertPayment, 
-      id, 
-      createdAt: new Date() 
-    };
-    this.paymentsMap.set(id, payment);
-    return payment;
+
+  async createSpecialization(data: InsertSpecialization) {
+    const spec = await SpecializationModel.create(data);
+    return spec.toObject();
   }
-  
-  async getPaymentsByUserId(userId: number): Promise<Payment[]> {
-    return Array.from(this.paymentsMap.values()).filter(
-      (payment) => payment.userId === userId
-    );
+
+  // Video methods
+  async getVideosByBranchId(branchId: string) {
+    return VideoModel.find({ 
+      branchId: new Types.ObjectId(branchId) 
+    }).lean().exec();
   }
-  
-  // Video operations
-  async getVideosByBranchId(branchId: number): Promise<Video[]> {
-    return Array.from(this.videosMap.values()).filter(
-      (video) => video.branchId === branchId
-    );
+
+  async getVideosByTeacherId(teacherId: string) {
+    return VideoModel.find({ 
+      teacherId: new Types.ObjectId(teacherId) 
+    }).lean().exec();
   }
-  
-  async getVideosByTeacherId(teacherId: number): Promise<Video[]> {
-    return Array.from(this.videosMap.values()).filter(
-      (video) => video.teacherId === teacherId
-    );
+
+  async createVideo(data: InsertVideo) {
+    const video = await VideoModel.create(data);
+    return video.toObject();
   }
-  
-  async createVideo(insertVideo: InsertVideo): Promise<Video> {
-    const id = this.videoCurrentId++;
-    const video: Video = { 
-      ...insertVideo, 
-      id, 
-      views: 0, 
-      createdAt: new Date() 
-    };
-    this.videosMap.set(id, video);
-    return video;
+
+  // VR Session methods
+  async createVrSession(data: InsertVrSession) {
+    const session = await VrSessionModel.create(data);
+    return session.toObject();
   }
-  
-  // VR Session operations
-  async createVrSession(insertSession: InsertVrSession): Promise<VrSession> {
-    const id = this.sessionCurrentId++;
-    const session: VrSession = { 
-      ...insertSession, 
-      id, 
-      startTime: new Date(), 
-      endTime: null 
-    };
-    this.vrSessionsMap.set(id, session);
-    return session;
+
+  async updateVrSession(id: string, data: Partial<IVrSession>) {
+    const updated = await VrSessionModel.findByIdAndUpdate(
+      new Types.ObjectId(id),
+      data,
+      { new: true }
+    ).lean().exec();
+    return updated;
   }
-  
-  async updateVrSession(id: number, updateData: Partial<VrSession>): Promise<VrSession> {
-    const session = this.vrSessionsMap.get(id);
-    if (!session) {
-      throw new Error(`VR Session with ID ${id} not found`);
-    }
-    
-    const updatedSession = { ...session, ...updateData };
-    this.vrSessionsMap.set(id, updatedSession);
-    return updatedSession;
+
+  async getVrSessionsByUserId(userId: string) {
+    return VrSessionModel.find({ 
+      userId: new Types.ObjectId(userId) 
+    }).lean().exec();
   }
-  
-  async getVrSessionsByUserId(userId: number): Promise<VrSession[]> {
-    return Array.from(this.vrSessionsMap.values()).filter(
-      (session) => session.userId === userId
-    );
+
+  // Payment methods
+  async createPayment(data: InsertPayment) {
+    const payment = await PaymentModel.create(data);
+    return payment.toObject();
   }
-  
-  // Generate unique student ID
-  generateStudentId(): string {
-    return `STU-${generateId(6)}`;
+
+  async getPaymentsByUserId(userId: string) {
+    return PaymentModel.find({ 
+      userId: new Types.ObjectId(userId) 
+    }).lean().exec();
   }
-  
-  // Seed initial branches
-  private async seedBranches() {
-    const branchesData: InsertBranch[] = [
-      {
-        name: "Computer Science Engineering",
-        description: "Programming, algorithms, and software development",
-        location: "Bangalore",
-        image: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97",
-        price: 45000,
-        studentsCount: 425,
-        teachersCount: 12
-      },
-      {
-        name: "Electrical Engineering",
-        description: "Circuits, power systems, and electronics",
-        location: "Mumbai",
-        image: "https://images.unsplash.com/photo-1623479322729-28b25c16b011",
-        price: 42000,
-        studentsCount: 310,
-        teachersCount: 8
-      },
-      {
-        name: "Mechanical Engineering",
-        description: "Machines, thermodynamics, and manufacturing",
-        location: "Delhi",
-        image: "https://images.unsplash.com/photo-1537462715879-360eeb61a0ad",
-        price: 40000,
-        studentsCount: 275,
-        teachersCount: 7
-      },
-      {
-        name: "Civil Engineering",
-        description: "Structures, construction, and infrastructure",
-        location: "Chennai",
-        image: "https://images.unsplash.com/photo-1581093450021-4a7360e9a6b5",
-        price: 38000,
-        studentsCount: 240,
-        teachersCount: 6
-      },
-      {
-        name: "Chemical Engineering",
-        description: "Reactions, materials, and processing",
-        location: "Hyderabad",
-        image: "https://images.unsplash.com/photo-1532094349884-543bc11b234d",
-        price: 39000,
-        studentsCount: 195,
-        teachersCount: 5
-      },
-      {
-        name: "AI & Machine Learning",
-        description: "Neural networks, data science, and automation",
-        location: "Pune",
-        image: "https://images.unsplash.com/photo-1555255707-c07966088b7b",
-        price: 48000,
-        studentsCount: 520,
-        teachersCount: 14
-      },
-      {
-        name: "Internet of Things",
-        description: "Connected devices, sensors, and smart systems",
-        location: "Bangalore",
-        image: "https://images.unsplash.com/photo-1518770660439-4636190af475",
-        price: 44000,
-        studentsCount: 385,
-        teachersCount: 9
-      },
-      {
-        name: "VR & AR Technology",
-        description: "Virtual environments, 3D modeling, and interaction",
-        location: "Mumbai",
-        image: "https://images.unsplash.com/photo-1626379953822-baec19c3accd",
-        price: 46000,
-        studentsCount: 310,
-        teachersCount: 8
-      }
-    ];
-    
-    for (const branchData of branchesData) {
-      const branch = await this.createBranch(branchData);
-      
-      // Add equipment kits for Computer Science branch
-      if (branch.name === "Computer Science Engineering") {
-        await this.createEquipmentKit({
-          branchId: branch.id,
-          name: "Development Laptop",
-          description: "High-performance laptop for programming and development",
-          icon: "laptop"
-        });
-        
-        await this.createEquipmentKit({
-          branchId: branch.id,
-          name: "VR Headset",
-          description: "For virtual lab experiences and 3D simulations",
-          icon: "headset"
-        });
-        
-        await this.createEquipmentKit({
-          branchId: branch.id,
-          name: "IoT Development Kit",
-          description: "Arduino, Raspberry Pi, and sensors for IoT projects",
-          icon: "memory"
-        });
-        
-        await this.createEquipmentKit({
-          branchId: branch.id,
-          name: "Cloud Credits",
-          description: "AWS/Azure/GCP credits for cloud computing practices",
-          icon: "storage"
-        });
-        
-        // Add specializations
-        await this.createSpecialization({
-          branchId: branch.id,
-          name: "Artificial Intelligence",
-          description: "Focus on machine learning, neural networks, and AI applications",
-          teachersCount: 4,
-          modulesCount: 12
-        });
-        
-        await this.createSpecialization({
-          branchId: branch.id,
-          name: "Cybersecurity",
-          description: "Network security, ethical hacking, and threat analysis",
-          teachersCount: 3,
-          modulesCount: 10
-        });
-        
-        await this.createSpecialization({
-          branchId: branch.id,
-          name: "Full-Stack Development",
-          description: "Complete web and mobile application development",
-          teachersCount: 5,
-          modulesCount: 15
-        });
-        
-        await this.createSpecialization({
-          branchId: branch.id,
-          name: "Cloud Computing",
-          description: "Cloud architecture, services, and deployment",
-          teachersCount: 3,
-          modulesCount: 8
-        });
-      }
-    }
+
+  // Student ID generation
+  private generateStudentId(): string {
+    return `STU-${generateId(6)}-${Date.now().toString().slice(-4)}`;
   }
 }
 
-// Database storage implementation
-import { db } from "./db";
-import { eq, and } from "drizzle-orm";
-import connectPg from "connect-pg-simple";
-import { pool } from "./db";
+// ---- 4) Mongoose Connection ----
 
-const PostgresSessionStore = connectPg(session);
+const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/vr-school";
 
-export class DatabaseStorage implements IStorage {
-  sessionStore: session.Store;
+mongoose.connect(mongoUri)
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch(err => {
+    console.error("❌ MongoDB connection error:", err);
+    process.exit(1);
+  });
 
-  constructor() {
-    this.sessionStore = new PostgresSessionStore({ 
-      pool, 
-      tableName: 'sessions',
-      createTableIfMissing: true 
-    });
-  }
+// ---- 5) Export storage ----
 
-  // User operations
-  async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
-  }
-
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user;
-  }
-
-  async getUserByStudentId(studentId: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.studentId, studentId));
-    return user;
-  }
-
-  async createUser(user: InsertUser): Promise<User> {
-    // If it's a student and no studentId is provided, generate one
-    if (user.role === 'student' && !user.studentId) {
-      user.studentId = this.generateStudentId();
-    }
-    
-    const [createdUser] = await db.insert(users).values(user).returning();
-    return createdUser;
-  }
-
-  async updateUser(id: number, userData: Partial<User>): Promise<User> {
-    const [updatedUser] = await db
-      .update(users)
-      .set(userData)
-      .where(eq(users.id, id))
-      .returning();
-    
-    if (!updatedUser) {
-      throw new Error(`User with ID ${id} not found`);
-    }
-    
-    return updatedUser;
-  }
-
-  // Branch operations
-  async getBranch(id: number): Promise<Branch | undefined> {
-    const [branch] = await db.select().from(branches).where(eq(branches.id, id));
-    return branch;
-  }
-
-  async getBranches(): Promise<Branch[]> {
-    return await db.select().from(branches);
-  }
-
-  async createBranch(branch: InsertBranch): Promise<Branch> {
-    const [createdBranch] = await db.insert(branches).values(branch).returning();
-    return createdBranch;
-  }
-
-  // Equipment kit operations
-  async getEquipmentKitsByBranchId(branchId: number): Promise<EquipmentKit[]> {
-    return await db
-      .select()
-      .from(equipmentKits)
-      .where(eq(equipmentKits.branchId, branchId));
-  }
-
-  async createEquipmentKit(kit: InsertEquipmentKit): Promise<EquipmentKit> {
-    const [createdKit] = await db.insert(equipmentKits).values(kit).returning();
-    return createdKit;
-  }
-
-  // Specialization operations
-  async getSpecializationsByBranchId(branchId: number): Promise<Specialization[]> {
-    return await db
-      .select()
-      .from(specializations)
-      .where(eq(specializations.branchId, branchId));
-  }
-
-  async createSpecialization(specialization: InsertSpecialization): Promise<Specialization> {
-    const [createdSpecialization] = await db
-      .insert(specializations)
-      .values(specialization)
-      .returning();
-    
-    return createdSpecialization;
-  }
-
-  // Payment operations
-  async createPayment(payment: InsertPayment): Promise<Payment> {
-    const [createdPayment] = await db.insert(payments).values(payment).returning();
-    return createdPayment;
-  }
-
-  async getPaymentsByUserId(userId: number): Promise<Payment[]> {
-    return await db
-      .select()
-      .from(payments)
-      .where(eq(payments.userId, userId));
-  }
-
-  // Video operations
-  async getVideosByBranchId(branchId: number): Promise<Video[]> {
-    return await db
-      .select()
-      .from(videos)
-      .where(eq(videos.branchId, branchId));
-  }
-
-  async getVideosByTeacherId(teacherId: number): Promise<Video[]> {
-    return await db
-      .select()
-      .from(videos)
-      .where(eq(videos.teacherId, teacherId));
-  }
-
-  async createVideo(video: InsertVideo): Promise<Video> {
-    const [createdVideo] = await db.insert(videos).values(video).returning();
-    return createdVideo;
-  }
-
-  // VR Session operations
-  async createVrSession(session: InsertVrSession): Promise<VrSession> {
-    const [createdSession] = await db
-      .insert(vrSessions)
-      .values(session)
-      .returning();
-    
-    return createdSession;
-  }
-
-  async updateVrSession(id: number, sessionData: Partial<VrSession>): Promise<VrSession> {
-    const [updatedSession] = await db
-      .update(vrSessions)
-      .set(sessionData)
-      .where(eq(vrSessions.id, id))
-      .returning();
-    
-    if (!updatedSession) {
-      throw new Error(`VR Session with ID ${id} not found`);
-    }
-    
-    return updatedSession;
-  }
-
-  async getVrSessionsByUserId(userId: number): Promise<VrSession[]> {
-    return await db
-      .select()
-      .from(vrSessions)
-      .where(eq(vrSessions.userId, userId));
-  }
-
-  // Generate unique student ID
-  generateStudentId(): string {
-    return `STU-${generateId(6)}`;
-  }
-
-  // Seed initial branches (only used for development)
-  async seedBranches() {
-    // Check if branches already exist
-    const existingBranches = await this.getBranches();
-    if (existingBranches.length > 0) {
-      console.log("Branches already exist, skipping seed");
-      return;
-    }
-
-    const branchesData: InsertBranch[] = [
-      {
-        name: "Computer Science Engineering",
-        description: "Programming, algorithms, and software development",
-        location: "Bangalore",
-        image: "https://images.unsplash.com/photo-1517694712202-14dd9538aa97",
-        price: 45000,
-        studentsCount: 425,
-        teachersCount: 12
-      },
-      {
-        name: "Electrical Engineering",
-        description: "Circuits, power systems, and electronics",
-        location: "Mumbai",
-        image: "https://images.unsplash.com/photo-1623479322729-28b25c16b011",
-        price: 42000,
-        studentsCount: 310,
-        teachersCount: 8
-      },
-      {
-        name: "Mechanical Engineering",
-        description: "Machines, thermodynamics, and manufacturing",
-        location: "Delhi",
-        image: "https://images.unsplash.com/photo-1537462715879-360eeb61a0ad",
-        price: 40000,
-        studentsCount: 275,
-        teachersCount: 7
-      },
-      {
-        name: "Civil Engineering",
-        description: "Structures, construction, and infrastructure",
-        location: "Chennai",
-        image: "https://images.unsplash.com/photo-1581093450021-4a7360e9a6b5",
-        price: 38000,
-        studentsCount: 240,
-        teachersCount: 6
-      },
-      {
-        name: "Chemical Engineering",
-        description: "Reactions, materials, and processing",
-        location: "Hyderabad",
-        image: "https://images.unsplash.com/photo-1532094349884-543bc11b234d",
-        price: 39000,
-        studentsCount: 195,
-        teachersCount: 5
-      },
-      {
-        name: "AI & Machine Learning",
-        description: "Neural networks, data science, and automation",
-        location: "Pune",
-        image: "https://images.unsplash.com/photo-1555255707-c07966088b7b",
-        price: 48000,
-        studentsCount: 520,
-        teachersCount: 14
-      },
-      {
-        name: "Internet of Things",
-        description: "Connected devices, sensors, and smart systems",
-        location: "Bangalore",
-        image: "https://images.unsplash.com/photo-1518770660439-4636190af475",
-        price: 44000,
-        studentsCount: 385,
-        teachersCount: 9
-      },
-      {
-        name: "VR & AR Technology",
-        description: "Virtual environments, 3D modeling, and interaction",
-        location: "Mumbai",
-        image: "https://images.unsplash.com/photo-1626379953822-baec19c3accd",
-        price: 46000,
-        studentsCount: 310,
-        teachersCount: 8
-      }
-    ];
-    
-    for (const branchData of branchesData) {
-      const branch = await this.createBranch(branchData);
-      
-      // Add equipment kits for Computer Science branch
-      if (branch.name === "Computer Science Engineering") {
-        await this.createEquipmentKit({
-          branchId: branch.id,
-          name: "Development Laptop",
-          description: "High-performance laptop for programming and development",
-          icon: "laptop"
-        });
-        
-        await this.createEquipmentKit({
-          branchId: branch.id,
-          name: "VR Headset",
-          description: "For virtual lab experiences and 3D simulations",
-          icon: "headset"
-        });
-        
-        await this.createEquipmentKit({
-          branchId: branch.id,
-          name: "IoT Development Kit",
-          description: "Arduino, Raspberry Pi, and sensors for IoT projects",
-          icon: "memory"
-        });
-        
-        await this.createEquipmentKit({
-          branchId: branch.id,
-          name: "Cloud Credits",
-          description: "AWS/Azure/GCP credits for cloud computing practices",
-          icon: "storage"
-        });
-        
-        // Add specializations
-        await this.createSpecialization({
-          branchId: branch.id,
-          name: "Artificial Intelligence",
-          description: "Focus on machine learning, neural networks, and AI applications",
-          teachersCount: 4,
-          modulesCount: 12
-        });
-        
-        await this.createSpecialization({
-          branchId: branch.id,
-          name: "Cybersecurity",
-          description: "Network security, ethical hacking, and threat analysis",
-          teachersCount: 3,
-          modulesCount: 10
-        });
-        
-        await this.createSpecialization({
-          branchId: branch.id,
-          name: "Full-Stack Development",
-          description: "Complete web and mobile application development",
-          teachersCount: 5,
-          modulesCount: 15
-        });
-        
-        await this.createSpecialization({
-          branchId: branch.id,
-          name: "Cloud Computing",
-          description: "Cloud architecture, services, and deployment",
-          teachersCount: 3,
-          modulesCount: 8
-        });
-      }
-    }
-  }
-}
-
-// Create and export storage instance
-export const storage = new DatabaseStorage();
+export const storage = new MongoStorage();
