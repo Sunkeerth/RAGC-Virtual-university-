@@ -1,6 +1,6 @@
-// src/lib/queryClient.ts
 import { QueryClient, QueryFunction, QueryFunctionContext } from "@tanstack/react-query";
 
+// Helper to throw detailed errors
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -8,13 +8,14 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// Generic API request function with token handling
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown
 ): Promise<Response> {
   const headers: Record<string, string> = {
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
   };
 
   const token = localStorage.getItem("authToken");
@@ -27,13 +28,14 @@ export async function apiRequest(
       method,
       headers,
       body: data ? JSON.stringify(data) : undefined,
-      credentials: "include",
+      credentials: "include", // Important for cookie sessions
     });
 
     if (res.status === 401) {
+      // Token invalid or missing
       localStorage.removeItem("authToken");
-      window.location.href = "/login";
-      return res;
+      window.location.href = "/auth"; // Redirect to login page
+      throw new Error("401: Unauthorized");
     }
 
     await throwIfResNotOk(res);
@@ -44,9 +46,9 @@ export async function apiRequest(
   }
 }
 
+// Query function used by React Query
 type UnauthorizedBehavior = "returnNull" | "throw" | "redirect";
 
-// ✅ Fixed getQueryFn with correct context type
 export const getQueryFn = <T>(options: {
   on401?: UnauthorizedBehavior;
 } = {}): QueryFunction<T> => async (context: QueryFunctionContext) => {
@@ -61,12 +63,13 @@ export const getQueryFn = <T>(options: {
 
     if (res.status === 401) {
       localStorage.removeItem("authToken");
+
       switch (options.on401) {
         case "returnNull":
           return null as T;
         case "redirect":
-          window.location.href = "/login";
-          return new Promise<T>(() => {}); // never resolves
+          window.location.href = "/auth"; // Redirect to auth page
+          return new Promise<T>(() => {}); // Block render
         default:
           throw new Error("Unauthorized");
       }
@@ -80,6 +83,7 @@ export const getQueryFn = <T>(options: {
   }
 };
 
+// Query Client for React Query
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -91,7 +95,7 @@ export const queryClient = new QueryClient({
         }
         return failureCount < 3;
       },
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 5 * 60 * 1000,
     },
     mutations: {
       retry: false,
