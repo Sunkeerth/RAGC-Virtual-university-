@@ -1,46 +1,33 @@
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { Request } from 'express';
-
-declare global {
-  namespace Express {
-    interface User {
-      _id: string;
-      role: string;
-    }
-
-    interface Request {
-      user?: User;
-    }
-  }
-}
+// File: src/server/middleware/upload.ts
+import multer from "multer";
+import path from "path";
+import { v4 as uuidv4 } from "uuid";
+import fs from "fs";
 
 const storage = multer.diskStorage({
-  destination: (req: Request, file, cb) => {
-    const role = req.user?.role || 'student';
-    const uploadPath = path.join(__dirname, '../../uploads', role);
+  destination: (req, file, cb) => {
+    const role = (req.user as { role?: string })?.role || "temp";
+    const uploadPath = path.join(process.cwd(), "uploads", role);
     fs.mkdirSync(uploadPath, { recursive: true });
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, `${req.user?._id}-${uniqueSuffix}${ext}`);
+    const uniqueSuffix = `${uuidv4()}${path.extname(file.originalname)}`;
+    cb(null, uniqueSuffix);
   }
 });
 
-const fileFilter = (req: Request, file: any, cb: any) => {
-  const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type. Only PDF, JPEG, and PNG are allowed.'));
-  }
-};
-
-export const upload = multer({
+const upload = multer({
   storage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Only PDF, JPG, and PNG are allowed."));
+    }
+  }
 });
+
+export default upload;

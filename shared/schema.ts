@@ -2,6 +2,23 @@
 import mongoose, { Schema, Document } from "mongoose";
 import { z } from "zod";
 
+export type DocumentType = 
+  | 'national_id'
+  | 'passport'
+  | 'birth_certificate'
+  | 'academic_transcript'
+  | 'marksheet'
+  | 'transfer_certificate'
+  | 'admission_letter'
+  | 'entrance_result'
+  | 'profile_photo'
+  | 'degree_certificate'
+  | 'ugc_net'
+  | 'experience_letter'
+  | 'resume'
+  | 'teacher_certification'
+  | 'pan_card'
+  | 'signature';
 
 export interface IDocument {
   type: string;
@@ -10,24 +27,21 @@ export interface IDocument {
   uploadedAt: Date;
   feedback?: string;
 }
+
+export type UserRole = "student" | "teacher" | "lecturer" | "admin";
+
 // ---- 1) Interfaces ----
 export interface IUser extends Document {
   name: string;
   email: string;
   phone: string;
   address: string;
-  role: "student" | "teacher" | "admin";
+  role: UserRole;
   username: string;
   password: string;
   studentId?: string;
   enrolledBranches: mongoose.Types.ObjectId[];
-  documents: {
-    type: 'student_id' | 'academic_transcript' | 'teacher_certification' | 'experience_letter';
-    url: string;
-    status: 'pending' | 'approved' | 'rejected';
-    uploadedAt: Date;
-    feedback?: string;
-  }[];
+  documents: IDocument[];
 }
 
 
@@ -109,16 +123,30 @@ const UserSchema = new Schema<IUser>({
   email: { type: String, required: true, unique: true },
   phone: { type: String, required: true },
   address: { type: String, required: true },
-  role: { type: String, enum: ["student", "teacher", "admin"], default: "student" },
+  role: { 
+    type: String, 
+    enum: ["student", "teacher", "lecturer", "admin"], 
+    default: "student" 
+  },
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   studentId: { type: String, unique: true, sparse: true },
-  enrolledBranches: [{ type: Schema.Types.ObjectId, ref: "Branch", default: [] }],
+  enrolledBranches: [{ 
+    type: Schema.Types.ObjectId, 
+    ref: "Branch", 
+    default: [] 
+  }],
   documents: [{
     type: { 
       type: String,
       required: true,
-      enum: ['student_id', 'academic_transcript', 'teacher_certification', 'experience_letter'] 
+      enum: [
+        'national_id', 'passport', 'birth_certificate', 
+        'academic_transcript', 'marksheet', 'transfer_certificate',
+        'admission_letter', 'entrance_result', 'profile_photo',
+        'degree_certificate', 'ugc_net', 'experience_letter',
+        'resume', 'teacher_certification', 'pan_card', 'signature'
+      ] as const
     },
     url: { type: String, required: true },
     status: { 
@@ -130,6 +158,7 @@ const UserSchema = new Schema<IUser>({
     feedback: { type: String }
   }]
 }, { timestamps: true });
+
 
 export const UserModel = mongoose.model<IUser>("User", UserSchema);
 // Branch
@@ -209,13 +238,13 @@ export const VrSessionModel = mongoose.model<IVrSession>("VrSession", VrSessionS
 
 // User
 export const insertUserSchema = z.object({
-  name: z.string(),
+  name: z.string().min(2),
   email: z.string().email(),
-  phone: z.string(),
-  address: z.string(),
-  role: z.enum(["student", "teacher", "admin"]).optional(),
-  username: z.string(),
-  password: z.string(),
+  phone: z.string().min(10),
+  address: z.string().min(5),
+  role: z.enum(["student", "teacher", "lecturer", "admin"]).optional(),
+  username: z.string().min(3),
+  password: z.string().min(6),
   studentId: z.string().optional(),
   enrolledBranches: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/)).optional(),
 });
@@ -284,9 +313,12 @@ export const insertVrSessionSchema = z.object({
 });
 export type InsertVrSession = z.infer<typeof insertVrSessionSchema>;
 
+// enchaded login validation 
+export const updateUserSchema = insertUserSchema.partial();
+export type UpdateUser = z.infer<typeof updateUserSchema>;
 // Login
 export const loginSchema = z.object({
-  username: z.string().min(1),
-  password: z.string().min(1),
+  username: z.string().min(3),
+  password: z.string().min(6),
 });
 export type LoginData = z.infer<typeof loginSchema>;
