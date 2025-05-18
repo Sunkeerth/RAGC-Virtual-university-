@@ -322,3 +322,14 @@ export const loginSchema = z.object({
   password: z.string().min(6),
 });
 export type LoginData = z.infer<typeof loginSchema>;
+
+const documentSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: "User" },
+  documentType: { type: String, required: true },
+  filePath: { type: String, required: true },
+  status: { type: String, default: "pending" }, // pending, approved, rejected
+  feedback: { type: String, default: "" },
+  uploadedAt: { type: Date, default: Date.now }
+});
+
+export const DocumentModel = mongoose.model("Document", documentSchema);
