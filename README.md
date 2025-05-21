@@ -145,55 +145,11 @@ Client (Frontend)                            Server (Backend)
 
 ---
 
-## Documentation 📄
 
-- **Literature Survey**: [See Summary](#literature-survey)
-- **Full Architecture Diagram**: [architecture image.png](#)
-- **API Docs**: `server/docs/api.md`
-- **User Manual**: `docs/user_manual.pdf`
 
-### Literature Survey Highlights
-| Study                 | Key Contribution                          | Limitation                        |
-|-----------------------|-------------------------------------------|-----------------------------------|
-| Guo & Gao (2022)      | Metaverse for immersive learning          | Reliance on stable internet      |
-| Patel et al (2020)    | VR labs improve coding proficiency        | Privacy concerns                 |
-| Deterding et al (2011)| Gamification boosts engagement            | Manual data sync required        |
 
----
 
-## Contributing 🤝
 
-1. Fork the repository.
-2. Create a feature branch:
-   ```bash
-   git checkout -b feature/your-feature
-   ```
-3. Commit changes and push to your fork.
-4. Open a pull request with a detailed description.
-
----
-
-## License 📜
-
-MIT License. See `LICENSE` for details.
-
----
-
-## Acknowledgments 🙏
-
-- **Project Guide**: Mrs. Hosmani Manikeshwari
-- **Team**: S. Rahul, Santosh P. M, Shankar M, Sunkeerth
-- **Advisors**: Dr. B.M Vidyavathi, Asha Jyothi P
-- **References**: [See Full List](#references)
-
----
-
-## Contact 📧
-
-- **Project Coordinator**: Asha Jyothi P (asha.jyothi@rgac.edu)
-- **Technical Support**: S. Rahul (rahul.ai139@rgac.edu)
-
----
 
 **Between the birth certificate and the death certificate lies the journey of learning—a continuous, lifelong process.**  
 🚀 Powered by AI & the Metaverse.
